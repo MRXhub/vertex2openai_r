@@ -24,6 +24,21 @@ from api_helpers import (
 from openai_handler import OpenAIDirectHandler
 from project_id_discovery import discover_project_id
 
+async def execute_with_retry(func, *args, **kwargs):
+    MAX_RETRIES = 3
+    INITIAL_DELAY = 5
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            return await func(*args, **kwargs)
+        except Exception as e:
+            err_str = str(e)
+            if "RESOURCE_EXHAUSTED" in err_str or "'code': 429" in err_str:
+                print(f"[WARN] Attempt {attempt}/{MAX_RETRIES} failed with RESOURCE_EXHAUSTED. Retrying in {INITIAL_DELAY * attempt}s...")
+                await asyncio.sleep(INITIAL_DELAY * attempt)
+                continue
+            raise
+    raise RuntimeError("Vertex AI call failed after max retries (RESOURCE_EXHAUSTED).")
+
 router = APIRouter()
 
 @router.post("/v1/chat/completions")
@@ -269,7 +284,7 @@ async def chat_completions(fastapi_request: Request, request: OpenAIRequest, api
                 if budget == 0:
                     gen_config_dict["thinking_config"]["include_thoughts"] = False
 
-            return await execute_gemini_call(client_to_use, base_model_name, current_prompt_func, gen_config_dict, request)
+            return await execute_with_retry(client_to_use, base_model_name, current_prompt_func, gen_config_dict, request)
 
     except Exception as e:
         error_msg = f"Unexpected error in chat_completions endpoint: {str(e)}"
