@@ -284,7 +284,7 @@ async def chat_completions(fastapi_request: Request, request: OpenAIRequest, api
                 if budget == 0:
                     gen_config_dict["thinking_config"]["include_thoughts"] = False
 
-            return await execute_with_retry(client_to_use, base_model_name, current_prompt_func, gen_config_dict, request)
+            return await execute_with_retry(execute_gemini_call,client_to_use,base_model_name,current_prompt_func,gen_config_dict,request)
 
     except Exception as e:
         error_msg = f"Unexpected error in chat_completions endpoint: {str(e)}"
