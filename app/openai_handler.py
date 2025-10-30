@@ -138,13 +138,20 @@ async def _post_with_retry(self, client, endpoint, headers, params, payload, ret
         if response.status_code == 429:
             print(f"[WARN] 429 RESOURCE_EXHAUSTED (attempt {attempt + 1}/{retries})")
             if attempt < retries - 1:
-                wait_time = backoff ** attempt
-                print(f"Retrying in {wait_time}s...")
+                wait_time = backoff ** attempt + random.uniform(0, 1)
+                print(f"Retrying in {wait_time:.1f}s...")
                 await asyncio.sleep(wait_time)
                 continue
-        response.raise_for_status()
-        return response
-    return response  # 返回最后一次响应
+        try:
+            response.raise_for_status()
+            return response
+        except httpx.HTTPStatusError:
+            # 如果不是429，直接抛出
+            if response.status_code != 429:
+                raise
+
+    # 所有尝试都失败
+    raise RuntimeError(f"API请求多次重试仍然失败 (429 Too Many Requests after {retries} retries)")
 
 # 然后在 create() 的非流式逻辑里：
 async with httpx.AsyncClient(**client_args) as client:
