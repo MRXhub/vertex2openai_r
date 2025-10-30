@@ -25,7 +25,7 @@ from openai_handler import OpenAIDirectHandler
 from project_id_discovery import discover_project_id
 
 async def execute_with_retry(func, *args, **kwargs):
-    MAX_RETRIES = 3
+    MAX_RETRIES = 5
     INITIAL_DELAY = 5
     for attempt in range(1, MAX_RETRIES + 1):
         try:
