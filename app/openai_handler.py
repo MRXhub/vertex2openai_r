@@ -131,6 +131,11 @@ class ExpressClientWrapper:
             client_args['proxies'] = proxies
         if app_config.SSL_CERT_FILE:
             client_args['verify'] = app_config.SSL_CERT_FILE
+        # 然后在 create() 的非流式逻辑里：
+        async with httpx.AsyncClient(**client_args) as client:
+            response = await self._post_with_retry(client, endpoint, headers, params, payload)
+            return FakeChatCompletion(response.json())
+    
     async def _post_with_retry(self, client, endpoint, headers, params, payload, retries=5, backoff=2):
         """发送POST请求并在429错误时自动重试"""
         for attempt in range(retries):
@@ -153,10 +158,6 @@ class ExpressClientWrapper:
         # 所有尝试都失败
         raise RuntimeError(f"API请求多次重试仍然失败 (429 Too Many Requests after {retries} retries)")
     
-    # 然后在 create() 的非流式逻辑里：
-    async with httpx.AsyncClient(**client_args) as client:
-        response = await self._post_with_retry(client, endpoint, headers, params, payload)
-        return FakeChatCompletion(response.json())
 
 
 class OpenAIDirectHandler:
