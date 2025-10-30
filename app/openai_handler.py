@@ -5,6 +5,7 @@ This module encapsulates all OpenAI-specific logic that was previously in chat_a
 import json
 import time
 import httpx
+import asyncio
 from typing import Dict, Any, AsyncGenerator
 
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -130,10 +131,25 @@ class ExpressClientWrapper:
             client_args['proxies'] = proxies
         if app_config.SSL_CERT_FILE:
             client_args['verify'] = app_config.SSL_CERT_FILE
-        async with httpx.AsyncClient(**client_args) as client:
-            response = await client.post(endpoint, headers=headers, params=params, json=payload, timeout=None)
-            response.raise_for_status()
-            return FakeChatCompletion(response.json())
+async def _post_with_retry(self, client, endpoint, headers, params, payload, retries=5, backoff=2):
+    """发送POST请求并在429错误时自动重试"""
+    for attempt in range(retries):
+        response = await client.post(endpoint, headers=headers, params=params, json=payload, timeout=None)
+        if response.status_code == 429:
+            print(f"[WARN] 429 RESOURCE_EXHAUSTED (attempt {attempt + 1}/{retries})")
+            if attempt < retries - 1:
+                wait_time = backoff ** attempt
+                print(f"Retrying in {wait_time}s...")
+                await asyncio.sleep(wait_time)
+                continue
+        response.raise_for_status()
+        return response
+    return response  # 返回最后一次响应
+
+# 然后在 create() 的非流式逻辑里：
+async with httpx.AsyncClient(**client_args) as client:
+    response = await self._post_with_retry(client, endpoint, headers, params, payload)
+    return FakeChatCompletion(response.json())
 
 
 class OpenAIDirectHandler:
