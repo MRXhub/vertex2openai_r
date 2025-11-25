@@ -440,6 +440,8 @@ def deobfuscate_text(text: str) -> str:
 def _convert_image_to_markdown(image_data: bytes, mime_type: str) -> str:
     """Convert image data to markdown format with base64 encoding."""
     try:
+        if not image_data:
+        return ""
         # Convert bytes to base64 string
         b64_data = base64.b64encode(image_data).decode('utf-8')
         # Create markdown image with data URL
