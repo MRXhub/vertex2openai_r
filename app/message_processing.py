@@ -437,17 +437,35 @@ def deobfuscate_text(text: str) -> str:
     text = text.replace("```", placeholder).replace("``", "").replace("♩", "").replace("`♡`", "").replace("♡", "").replace("` `", "").replace("`", "").replace(placeholder, "```")
     return text
 
-def _convert_image_to_markdown(image_data: bytes, mime_type: str) -> str:
-    """Convert image data to markdown format with base64 encoding."""
+
+def _convert_image_to_markdown(image_data: Union[bytes, str], mime_type: Optional[str] = "image/png") -> str:
+    """Convert image data to markdown format with smart base64 handling."""
     try:
         if not image_data:
-          return ""
-        # Convert bytes to base64 string
-        b64_data = base64.b64encode(image_data).decode('utf-8')
-        # Create markdown image with data URL
+            return ""
+        if not mime_type:
+            mime_type = "image/png"
+        b64_data = ""
+
+        if isinstance(image_data, str):
+            b64_data = image_data
+
+        elif isinstance(image_data, bytes):
+            try:
+                decoded = image_data.decode('utf-8')
+                clean_decoded = decoded.replace('\n', '').replace('\r', '').strip()
+
+                if len(clean_decoded) > 0 and re.match(r'^[A-Za-z0-9+/=]+$', clean_decoded):
+                    b64_data = clean_decoded
+                else:
+                    b64_data = base64.b64encode(image_data).decode('utf-8')
+
+            except UnicodeDecodeError:
+                b64_data = base64.b64encode(image_data).decode('utf-8')
+
         data_url = f"data:{mime_type};base64,{b64_data}"
-        # Return markdown formatted image
         return f"![Image]({data_url})"
+
     except Exception as e:
         print(f"Error converting image to markdown: {e}")
         return "[Image could not be displayed]"
